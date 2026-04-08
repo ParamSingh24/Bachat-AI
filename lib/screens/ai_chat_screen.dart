@@ -118,7 +118,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     } else {
        // --- RENDER HOSTED BACKEND FALLBACK ---
        // User can put their exact Render URL here (e.g. "https://my-backend.onrender.com")
-       const String RENDER_BACKEND_URL = "https://your-backend-url.onrender.com"; 
+       const String RENDER_BACKEND_URL = "https://mindforge-param.onrender.com"; 
        
        if (RENDER_BACKEND_URL.contains("your-backend-url")) {
            // Basic heuristic matching fallback if render URL is not set

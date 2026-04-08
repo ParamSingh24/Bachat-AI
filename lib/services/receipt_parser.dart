@@ -16,7 +16,7 @@ class ReceiptParser {
     if (apiKey.trim().isEmpty) {
         // --- RENDER HOSTED BACKEND FALLBACK ---
         // User can put their exact Render URL here (e.g. "https://my-backend.onrender.com")
-        const String RENDER_BACKEND_URL = "https://your-backend-url.onrender.com"; 
+        const String RENDER_BACKEND_URL = "https://mindforge-param.onrender.com"; 
         
         if (!RENDER_BACKEND_URL.contains("your-backend-url")) {
            try {

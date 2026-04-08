@@ -1,17 +1,29 @@
-# kalpathon
+# MindForge_Param
 
-A new Flutter project.
+A high-performance cross-platform mobile application architecture utilizing Google's Gemini LLMs for advanced multimodal processing and data extraction.
 
-## Getting Started
+## Technical Stack
 
-This project is a starting point for a Flutter application.
+### Frontend Application
+- **Framework:** Flutter (Dart)
+- **State Management:** Provider
+- **Cloud Infrastructure:** Firebase Authentication
 
-A few resources to get you started if this is your first Flutter project:
+### Native Device Integrations
+- **Speech-to-Text:** Live voice parsing using `speech_to_text`.
+- **Text-to-Speech:** Native device articulation via `flutter_tts` (configured natively for `hi-IN` and `en-US` dialect control).
+- **Computer Vision / OCR:** Real-time text extraction using Google ML Kit Text Recognition API.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+### Backend Infrastructure & AI
+- **Primary AI Engine:** Gemini 2.5 Flash Lite API.
+- **Proxy Microservice:** Node.js / Express proxy server (`Backend_On_render_hosted`).
+- **Proxy Deployment Environment:** Render (PaaS).
+- **Failover Routing Logic:** Multi-tier fallback protection (Direct API Tunnel -> Hosted Proxy Server -> Localized Device Regex Heuristics).
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Build Instructions (Android)
+
+1. Ensure Java JDK 21+ is installed (`Eclipse Adoptium` recommended).
+2. Install the Flutter SDK and map variables.
+3. Clean cache: `flutter clean`
+4. Fetch dependencies: `flutter pub get`
+5. Compile Release: `flutter build apk`
