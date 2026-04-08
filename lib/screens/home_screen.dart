@@ -16,6 +16,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// Main dashboard screen showing recent expenses and the primary action button.
 class _HomeScreenState extends State<HomeScreen> {
   final OcrService _ocrService = OcrService();
   final TtsService _ttsService = TtsService();
