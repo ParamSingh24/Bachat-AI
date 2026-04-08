@@ -8,8 +8,8 @@ class TtsService {
   }
 
   Future<void> _initTts() async {
-    await _flutterTts.setSpeechRate(0.45); // Slightly slower for better articulation
-    await _flutterTts.setPitch(1.0); // Natural pitch
+    await _flutterTts.setSpeechRate(0.5); // Natural speech rate
+    await _flutterTts.setPitch(1.0); // Resetting to natural pitch (1.0) for standard Indian voice
   }
 
   // Set the language based on user's choice

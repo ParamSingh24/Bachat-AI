@@ -45,6 +45,13 @@ dependencies:
   fl_chart: ^1.2.0
   shared_preferences: ^2.5.5
   google_fonts: ^8.0.2
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.3
+  cloud_firestore: ^5.6.9
+  google_sign_in: ^6.2.1
+  http: ^1.6.0
+  speech_to_text: ^7.3.0
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:

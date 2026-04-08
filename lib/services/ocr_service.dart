@@ -8,7 +8,7 @@ class OcrService {
   final ImagePicker _picker = ImagePicker();
   final TextRecognizer _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin); // Use latin as it supports English & some Hindi transliterations if applicable. Otherwise we'd need multiple recognizers.
 
-  Future<Map<String, dynamic>?> scanReceipt() async {
+  Future<Map<String, dynamic>?> scanReceipt(String geminiKey) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.camera);
     if (image == null) return null; // User cancelled
 
@@ -16,7 +16,7 @@ class OcrService {
     
     try {
       final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
-      return ReceiptParser.parse(recognizedText.text);
+      return await ReceiptParser.parseWithAI(recognizedText.text, geminiKey);
     } catch (e) {
       print("OCR Error: $e");
       return null;

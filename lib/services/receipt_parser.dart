@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
 class ReceiptParser {
-  static final RegExp _amountRegex = RegExp(r'(?:rs|inr|₹|$)?\s*(\d+(?:\.\d{1,2})?)', caseSensitive: false);
+  static final RegExp _amountRegex = RegExp(r'(?:rs\.?|inr|₹)\s*(\d+(?:\.\d{1,2})?)|\b(\d+(?:\.\d{1,2})?)\s*(?:rs|inr|₹|/-)', caseSensitive: false);
   static final RegExp _dateRegex = RegExp(r'(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})');
 
   static final Map<String, List<String>> _categoryKeywords = {
@@ -8,6 +11,85 @@ class ReceiptParser {
     'Shopping': ['mall', 'store', 'mart', 'supermarket', 'clothing', 'retail'],
     'Bills': ['electricity', 'recharge', 'water', 'bill', 'broadband', 'airtel', 'jio'],
   };
+
+  static Future<Map<String, dynamic>> parseWithAI(String text, String apiKey) async {
+    if (apiKey.trim().isEmpty) {
+        // --- RENDER HOSTED BACKEND FALLBACK ---
+        // User can put their exact Render URL here (e.g. "https://my-backend.onrender.com")
+        const String RENDER_BACKEND_URL = "https://your-backend-url.onrender.com"; 
+        
+        if (!RENDER_BACKEND_URL.contains("your-backend-url")) {
+           try {
+             final url = Uri.parse("$RENDER_BACKEND_URL/api/ocr");
+             final prompt = '''You are a receipt parser. I will give you raw OCR text. Extract these 4 fields into a STRICT JSON object:
+amount: (double, total numeric amount),
+vendor: (string, the name of the store or app),
+category: (string, exact match one of: Food, Transport, Shopping, Bills, Other),
+date: (string in YYYY-MM-DD format).
+
+Only output the raw valid JSON, nothing else. No markdown wrappers. Text: $text''';
+
+             final res = await http.post(
+               url,
+               headers: {'Content-Type': 'application/json'},
+               body: jsonEncode({"prompt": prompt})
+             );
+             
+             if (res.statusCode == 200) {
+                final data = jsonDecode(res.body);
+                String rawJson = data['candidates'][0]['content']['parts'][0]['text'];
+                rawJson = rawJson.replaceAll('```json', '').replaceAll('```', '').trim();
+                Map<String, dynamic> parsed = jsonDecode(rawJson);
+                return {
+                  'amount': (parsed['amount'] as num?)?.toDouble() ?? 0.0,
+                  'date': DateTime.tryParse(parsed['date'].toString()) ?? DateTime.now(),
+                  'vendor': parsed['vendor']?.toString() ?? 'Unknown',
+                  'category': parsed['category']?.toString() ?? 'Other'
+                };
+             }
+           } catch (_) {}
+        }
+        
+        return parse(text); // Fallback to regex local if all fails
+    }
+    
+    try {
+      final url = Uri.parse("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$apiKey");
+      final prompt = '''You are a receipt parser. I will give you raw OCR text. Extract these 4 fields into a STRICT JSON object:
+amount: (double, total numeric amount),
+vendor: (string, the name of the store or app),
+category: (string, exact match one of: Food, Transport, Shopping, Bills, Other),
+date: (string in YYYY-MM-DD format).
+
+Only output the raw valid JSON, nothing else. No markdown wrappers. Text: $text''';
+
+      final res = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [{"parts":[{"text": prompt}]}]
+        })
+      );
+      
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        String rawJson = data['candidates'][0]['content']['parts'][0]['text'];
+        
+        // Strip markdown backticks if Gemini accidentally adds them
+        rawJson = rawJson.replaceAll('```json', '').replaceAll('```', '').trim();
+        Map<String, dynamic> parsed = jsonDecode(rawJson);
+        
+        return {
+          'amount': (parsed['amount'] as num?)?.toDouble() ?? 0.0,
+          'date': DateTime.tryParse(parsed['date'].toString()) ?? DateTime.now(),
+          'vendor': parsed['vendor']?.toString() ?? 'Unknown',
+          'category': parsed['category']?.toString() ?? 'Other'
+        };
+      }
+    } catch (_) {}
+    
+    return parse(text);
+  }
 
   static Map<String, dynamic> parse(String text) {
     // 1. Amount

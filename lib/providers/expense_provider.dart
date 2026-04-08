@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/expense.dart';
 import '../services/database_helper.dart';
 
@@ -20,10 +22,41 @@ class ExpenseProvider with ChangeNotifier {
     if (persist) {
       await DatabaseHelper.instance.create(expense);
       await loadExpenses();
+      
+      // Mirror to Firebase if authenticated
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+           .collection('users')
+           .doc(user.uid)
+           .collection('expenses')
+           .doc(expense.id.toString())
+           .set(expense.toMap());
+      }
     } else {
       _expenses.insert(0, expense);
       notifyListeners();
     }
+  }
+
+  Future<void> syncDownFromFirebase() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    final snapshot = await FirebaseFirestore.instance
+       .collection('users')
+       .doc(user.uid)
+       .collection('expenses')
+       .get();
+       
+    for (var doc in snapshot.docs) {
+      final expense = Expense.fromMap(doc.data());
+      // Only insert to SQLite if it doesn't exist
+      if (!_expenses.any((e) => e.id == expense.id)) {
+        await DatabaseHelper.instance.create(expense);
+      }
+    }
+    await loadExpenses();
   }
 
   Future<void> updateExpense(Expense expense) async {

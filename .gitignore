@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Security & Diagnostic Leaks
+*.txt
+*.json
+.env
+google-services*.json
+android/app/google-services.json
+Backend_On_render_hosted/.env

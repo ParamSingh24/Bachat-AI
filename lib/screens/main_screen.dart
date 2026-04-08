@@ -11,6 +11,11 @@ import '../providers/expense_provider.dart';
 import '../models/expense.dart';
 import '../services/ai_logic_engine.dart';
 import '../services/tts_service.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../services/receipt_parser.dart';
+import 'ai_chat_screen.dart';
+import 'reports_history_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -23,14 +28,15 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final OcrService _ocrService = OcrService();
   final TtsService _ttsService = TtsService();
+  final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isProcessing = false;
+  bool _isListening = false;
   
   final List<Widget> _screens = [
     const HomeScreen(),
     const ReportScreen(),
-    // We add empty placeholders for the right side tabs matching the UI layout
-    Container(),
-    Container(), 
+    const AiChatScreen(),
+    const ReportsHistoryScreen(), 
   ];
 
   void _globalScanReceipt() async {
@@ -38,31 +44,28 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _isProcessing = true);
     
     // Always open the real camera so it looks authentic
-    final rawResult = await _ocrService.scanReceipt();
+    final rawResult = await _ocrService.scanReceipt(settings.geminiApiKey);
     
     if (rawResult != null) {
       if (settings.isDemoMode) {
-        // --- DEMO MODE: Inject 4 Mock Receipts, Ignore OCR ---
-        final List<Expense> fakeData = [
-          Expense(amount: 1500.0, category: 'Food', vendor: 'Gourmet Cafe', date: DateTime.now().subtract(const Duration(days: 1))),
-          Expense(amount: 950.0, category: 'Transport', vendor: 'Uber Ride', date: DateTime.now().subtract(const Duration(days: 2))),
-          Expense(amount: 3200.0, category: 'Food', vendor: 'Zomato Delivery', date: DateTime.now()),
-          Expense(amount: 400.0, category: 'Shopping', vendor: 'Reliance Fresh', date: DateTime.now().subtract(const Duration(days: 1))),
-        ];
+        // Simulate heavy AI processing friction
+        await Future.delayed(const Duration(seconds: 3));
         
+        // --- DEMO MODE: Inject Precise Mock Data ---
+        final expense = Expense(
+          amount: 1233.0,
+          date: DateTime.now(),
+          vendor: 'Savana',
+          category: 'Shopping',
+        );
         final provider = context.read<ExpenseProvider>();
-        for (var expense in fakeData) {
-           await provider.addExpense(expense, persist: false);
-        }
+        await provider.addExpense(expense, persist: false);
         
         if (mounted) {
-          // Calculate the new total for 'Food' to trigger the specific warning
-          double foodTotal = provider.categoryBreakdown['Food'] ?? 0.0;
-          String suggestion = BudgetStrategist.generateLocalSuggestion(
-            fakeData[2].amount, 'Food', foodTotal, isHindi: settings.isHindi
-          );
-          
-          _showAiFeedback(suggestion, settings.isHindi);
+           String feedback = settings.isHindi 
+               ? "परम जी, थोड़े कपड़े कम खरीदिए, आपका बजट क्रॉस हो रहा है!"
+               : "Param, you are buying too much clothes please drop it low";
+           _showAiFeedback(feedback, settings.isHindi);
         }
       } else {
         // --- REAL MODE ---
@@ -91,6 +94,57 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  void _listenToVoice() async {
+    final settings = context.read<SettingsProvider>();
+    if (!_isListening) {
+      bool available = await _speech.initialize();
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(onResult: (val) async {
+          if (val.finalResult) {
+            setState(() { _isListening = false; _isProcessing = true; });
+            
+            // Send recognized words to AI Parser
+            Map<String, dynamic> rawResult = await ReceiptParser.parseWithAI(val.recognizedWords, settings.geminiApiKey);
+            
+            if (rawResult != null) {
+              // Removed Demo Mode override from Voice Input so it can match Swiggy/Zomato naturally
+              
+              final expense = Expense(
+                amount: rawResult['amount'] ?? 0.0,
+                date: rawResult['date'] ?? DateTime.now(),
+                vendor: rawResult['vendor'] ?? 'Unknown',
+                category: rawResult['category'] ?? 'Other',
+              );
+              
+              if (mounted && expense.amount > 0) {
+                final provider = context.read<ExpenseProvider>();
+                await provider.addExpense(expense);
+                
+                String feedback = settings.isHindi ? '₹${expense.amount} jud gaye.' : 'Successfully added ₹${expense.amount} to ${expense.category}.';
+                final vendorLower = expense.vendor.toLowerCase();
+                if (vendorLower.contains('zomato') || vendorLower.contains('swiggy')) {
+                   feedback = settings.isHindi
+                       ? "परम जी, घर का बना हुआ खाना खाइए। यह आपकी हेल्थ और बजट दोनों के लिए अच्छा है।"
+                       : "Param, eat home-cooked food. It is better for your health and budget.";
+                }
+                
+                _showAiFeedback(feedback, settings.isHindi);
+              } else if (mounted) {
+                _showAiFeedback('Could not read amount clearly.', settings.isHindi);
+              }
+              
+              if (mounted) setState(() => _isProcessing = false);
+            }
+          }
+        });
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
+
   void _showAiFeedback(String text, bool isHindi) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -104,13 +158,16 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final displayName = user?.displayName?.split(' ').first ?? 'User';
+
     return Scaffold(
       extendBody: true, // Needed for transparent FAB notched bottom bar
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Ethereal Ledger", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 18, color: AppTheme.onPrimary)),
+            Text("Hello, $displayName!", style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 18, color: AppTheme.onPrimary, fontWeight: FontWeight.bold)),
             Text("Current budget", style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.primaryContainer)),
           ],
         ),
@@ -118,12 +175,21 @@ class _MainScreenState extends State<MainScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const CircleAvatar(
+            icon: Icon(
+               _isListening ? Icons.mic : Icons.mic_none, 
+               color: _isListening ? Colors.red : AppTheme.surfaceContainerLowest
+            ),
+            onPressed: _listenToVoice,
+          ),
+          IconButton(
+            icon: CircleAvatar(
               backgroundColor: AppTheme.surfaceContainerLowest,
-              child: Icon(Icons.person, color: AppTheme.primary),
+              backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+              child: user?.photoURL == null ? const Icon(Icons.person, color: AppTheme.primary) : null,
             ),
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()))
+                  .then((_) => setState(() {})); // Refresh on return from profile
             },
           ),
           const SizedBox(width: 8),
@@ -154,10 +220,10 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildTabItem(icon: Icons.stacked_line_chart, label: 'Activity', index: 0),
-            _buildTabItem(icon: Icons.account_balance_wallet_outlined, label: 'Budget', index: 1),
+            _buildTabItem(icon: Icons.analytics_outlined, label: 'Analyse', index: 1),
             const SizedBox(width: 48), // Space for FAB
-            _buildTabItem(icon: Icons.receipt_long_outlined, label: 'Transactions', index: 2),
-            _buildTabItem(icon: Icons.credit_card_outlined, label: 'Accounts', index: 3),
+            _buildTabItem(icon: Icons.smart_toy_outlined, label: 'AI', index: 2),
+            _buildTabItem(icon: Icons.history_outlined, label: 'Reports', index: 3),
           ],
         ),
       ),
@@ -169,7 +235,7 @@ class _MainScreenState extends State<MainScreen> {
     final color = isSelected ? AppTheme.primary : AppTheme.outlineVariant;
     return GestureDetector(
       onTap: () {
-        if (index < 2) {
+        if (index < 4) {
            setState(() => _currentIndex = index);
         }
       },
