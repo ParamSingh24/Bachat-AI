@@ -1,29 +1,85 @@
-# MindForge_Param
+MindForge_Param
+MindForge_Param is a high-performance, cross-platform mobile architecture engineered for advanced multimodal processing. By leveraging Google’s Gemini LLM ecosystem, the application facilitates seamless real-time data extraction, voice interaction, and intelligent visual analysis.
 
-A high-performance cross-platform mobile application architecture utilizing Google's Gemini LLMs for advanced multimodal processing and data extraction.
+Key Features
+Multimodal Intelligence: Integrated with Gemini 2.5 Flash Lite for rapid, high-context data processing.
 
-## Technical Stack
+Real-time OCR: On-device computer vision for instant text extraction using Google ML Kit.
 
-### Frontend Application
-- **Framework:** Flutter (Dart)
-- **State Management:** Provider
-- **Cloud Infrastructure:** Firebase Authentication
+Bilingual Voice Engine: Native Speech-to-Text (STT) and Text-to-Speech (TTS) optimized for en-US and hi-IN dialects.
 
-### Native Device Integrations
-- **Speech-to-Text:** Live voice parsing using `speech_to_text`.
-- **Text-to-Speech:** Native device articulation via `flutter_tts` (configured natively for `hi-IN` and `en-US` dialect control).
-- **Computer Vision / OCR:** Real-time text extraction using Google ML Kit Text Recognition API.
+High-Availability Backend: A resilient, multi-tier proxy architecture ensuring constant AI uptime through intelligent failover routing.
 
-### Backend Infrastructure & AI
-- **Primary AI Engine:** Gemini 2.5 Flash Lite API.
-- **Proxy Microservice:** Node.js / Express proxy server (`Backend_On_render_hosted`).
-- **Proxy Deployment Environment:** Render (PaaS).
-- **Failover Routing Logic:** Multi-tier fallback protection (Direct API Tunnel -> Hosted Proxy Server -> Localized Device Regex Heuristics).
+Technical Stack
+Frontend & Core
+Framework: Flutter (Dart)
 
-## Build Instructions (Android)
+State Management: Provider
 
-1. Ensure Java JDK 21+ is installed (`Eclipse Adoptium` recommended).
-2. Install the Flutter SDK and map variables.
-3. Clean cache: `flutter clean`
-4. Fetch dependencies: `flutter pub get`
-5. Compile Release: `flutter build apk`
+Security: Firebase Authentication
+
+Native Integrations
+Vision: Google ML Kit Text Recognition API.
+
+STT: speech_to_text for live voice parsing.
+
+TTS: flutter_tts with native platform configuration for dialect precision.
+
+Backend & AI Infrastructure
+AI Engine: Gemini 2.5 Flash Lite API.
+
+Middleware: Node.js / Express proxy microservice.
+
+Hosting: Render (PaaS).
+
+Failover Logic:
+
+Tier 1: Direct API Tunnel.
+
+Tier 2: Hosted Proxy Server.
+
+Tier 3: Localized Device Regex Heuristics (Edge-fallback).
+
+Architecture Overview
+The system utilizes a hybrid cloud-edge approach to minimize latency while maximizing reliability.
+
+Build & Installation
+Prerequisites
+Java JDK: 21+ (Eclipse Adoptium recommended).
+
+Flutter SDK: Latest stable version.
+
+Android Studio: Configured with Android SDK and Command-line Tools.
+
+Build Steps (Android)
+Clone and Navigate:
+
+Bash
+git clone https://github.com/your-repo/MindForge_Param.git
+cd MindForge_Param
+Environment Cleanup:
+Clear existing build artifacts and cache:
+
+Bash
+flutter clean
+Dependency Management:
+Fetch all required Dart and Flutter packages:
+
+Bash
+flutter pub get
+Production Compilation:
+Generate the release-ready APK:
+
+Bash
+flutter build apk
+🔧 Configuration
+To ensure the native TTS and STT modules function correctly, ensure the following permissions are handled in your AndroidManifest.xml:
+
+RECORD_AUDIO
+
+INTERNET
+
+CAMERA (For OCR/ML Kit)
+
+🛡️ License
+This project is licensed under the MIT License.
