@@ -47,25 +47,45 @@ class _MainScreenState extends State<MainScreen> {
     final rawResult = await _ocrService.scanReceipt(settings.geminiApiKey);
     
     if (rawResult != null) {
-      // --- PROCESS LEGITIMATE DATA ---
-      // We removed the hardcoded mock (Savana/1233.0) so the app tests real functionality
-      final expense = Expense(
-        amount: rawResult['amount'] ?? 0.0,
-        date: rawResult['date'] ?? DateTime.now(),
-        vendor: rawResult['vendor'] ?? 'Unknown Vendor',
-        category: rawResult['category'] ?? 'Other',
-      );
-
-      if (mounted) {
-        final provider = context.read<ExpenseProvider>();
-        // If in demo mode, do not persist to database, but still show legit functionality
-        await provider.addExpense(expense, persist: !settings.isDemoMode);
+      if (settings.isDemoMode) {
+        // Simulate heavy AI processing friction
+        await Future.delayed(const Duration(seconds: 3));
         
-        double catTotal = provider.categoryBreakdown[expense.category] ?? 0.0;
-        String suggestion = BudgetStrategist.generateLocalSuggestion(
-          expense.amount, expense.category, catTotal, isHindi: settings.isHindi
+        // --- DEMO MODE: Inject Precise Mock Data ---
+        final expense = Expense(
+          amount: 1233.0,
+          date: DateTime.now(),
+          vendor: 'Savana',
+          category: 'Shopping',
         );
-        _showAiFeedback(suggestion, settings.isHindi);
+        final provider = context.read<ExpenseProvider>();
+        await provider.addExpense(expense, persist: true); // Show on dashboard
+        
+        if (mounted) {
+           String feedback = settings.isHindi 
+               ? "परम जी, थोड़े कपड़े कम खरीदिए, आप ज्यादा खरीद रहे हैं!"
+               : "Param, you are buying too much clothes please drop it low";
+           _showAiFeedback(feedback, settings.isHindi);
+        }
+      } else {
+        // --- PROCESS LEGITIMATE DATA ---
+        final expense = Expense(
+          amount: rawResult['amount'] ?? 0.0,
+          date: rawResult['date'] ?? DateTime.now(),
+          vendor: rawResult['vendor'] ?? 'Unknown Vendor',
+          category: rawResult['category'] ?? 'Other',
+        );
+
+        if (mounted) {
+          final provider = context.read<ExpenseProvider>();
+          await provider.addExpense(expense, persist: true);
+          
+          double catTotal = provider.categoryBreakdown[expense.category] ?? 0.0;
+          String suggestion = BudgetStrategist.generateLocalSuggestion(
+            expense.amount, expense.category, catTotal, isHindi: settings.isHindi
+          );
+          _showAiFeedback(suggestion, settings.isHindi);
+        }
       }
     }
     
@@ -84,12 +104,21 @@ class _MainScreenState extends State<MainScreen> {
           if (val.finalResult) {
             setState(() { _isListening = false; _isProcessing = true; });
             
-            // Send recognized words to AI Parser
-            Map<String, dynamic> rawResult = await ReceiptParser.parseWithAI(val.recognizedWords, settings.geminiApiKey);
+            Map<String, dynamic>? rawResult;
+            
+            if (settings.isDemoMode) {
+               await Future.delayed(const Duration(seconds: 1));
+               rawResult = {
+                 'amount': 90.0,
+                 'vendor': 'Zomato',
+                 'category': 'Food',
+                 'date': DateTime.now(),
+               };
+            } else {
+               rawResult = await ReceiptParser.parseWithAI(val.recognizedWords, settings.geminiApiKey);
+            }
             
             if (rawResult != null) {
-              // Removed Demo Mode override from Voice Input so it can match Swiggy/Zomato naturally
-              
               final expense = Expense(
                 amount: rawResult['amount'] ?? 0.0,
                 date: rawResult['date'] ?? DateTime.now(),
@@ -99,13 +128,13 @@ class _MainScreenState extends State<MainScreen> {
               
               if (mounted && expense.amount > 0) {
                 final provider = context.read<ExpenseProvider>();
-                await provider.addExpense(expense);
+                await provider.addExpense(expense, persist: true);
                 
                 String feedback = settings.isHindi ? '₹${expense.amount} jud gaye.' : 'Successfully added ₹${expense.amount} to ${expense.category}.';
                 final vendorLower = expense.vendor.toLowerCase();
                 if (vendorLower.contains('zomato') || vendorLower.contains('swiggy')) {
                    feedback = settings.isHindi
-                       ? "परम जी, घर का बना हुआ खाना खाइए। यह आपकी हेल्थ और बजट दोनों के लिए अच्छा है।"
+                       ? "परम जी, बाहर का खाना थोड़ा कम खाइए। यह आपकी हेल्थ और बजट दोनों के लिए अच्छा है।"
                        : "Param, eat home-cooked food. It is better for your health and budget.";
                 }
                 
